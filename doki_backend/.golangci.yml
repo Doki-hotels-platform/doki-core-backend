@@ -1,0 +1,49 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - depguard
+    - gosec
+    - misspell
+
+linters-settings:
+  depguard:
+    rules:
+      domain-no-framework-imports:
+        files:
+          - "internal/domain/**/*.go"
+        deny:
+          - pkg: "github.com/*/pgx*"
+            desc: "domain must not import database drivers"
+          - pkg: "net/http"
+            desc: "domain must not import HTTP transport"
+          - pkg: "github.com/redis/*"
+            desc: "domain must not import cache clients"
+          - pkg: "github.com/go-chi/*"
+            desc: "domain must not import HTTP router frameworks"
+          - pkg: "doki-backend/internal/adapter/*"
+            desc: "domain must not import adapter implementations"
+          - pkg: "doki-backend/internal/platform/*"
+            desc: "domain must not import platform implementations"
+      adapter-no-cross-context-http-import:
+        files:
+          - "internal/adapter/repository/**/*.go"
+          - "internal/adapter/cache/**/*.go"
+          - "internal/adapter/integration/**/*.go"
+        deny:
+          - pkg: "doki-backend/internal/adapter/http"
+            desc: "adapters must not import the HTTP layer"
+
+issues:
+  exclude-dirs:
+    - test
+  max-issues-per-linter: 0
+  max-same-issues: 0
