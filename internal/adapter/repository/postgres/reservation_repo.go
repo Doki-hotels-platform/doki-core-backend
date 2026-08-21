@@ -191,6 +191,71 @@ func (r *ReservationRepository) UpdateStatus(ctx context.Context, id uuid.UUID, 
 	return nil
 }
 
+// GetExpiredHolds fetches pending holds whose expiration timestamp has passed.
+// Uses FOR UPDATE SKIP LOCKED to prevent race conditions and lock contention across worker replicas.
+func (r *ReservationRepository) GetExpiredHolds(ctx context.Context, cutoff time.Time, limit int) ([]*domain.Reservation, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := `
+		SELECT 
+			id, booking_reference, property_id, room_type_id,
+			guest_name, guest_phone, check_in_date, check_out_date,
+			status, hold_token, hold_expires_at, created_at, updated_at
+		FROM reservation.reservations
+		WHERE status = 'INVENTORY_HOLD' AND hold_expires_at <= $1
+		ORDER BY hold_expires_at ASC
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED;
+	`
+
+	rows, err := r.pool.Query(ctx, query, cutoff, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query expired holds: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*domain.Reservation
+	for rows.Next() {
+		var res domain.Reservation
+		if err := rows.Scan(
+			&res.ID, &res.BookingReference, &res.PropertyID, &res.RoomTypeID,
+			&res.GuestName, &res.GuestPhone, &res.CheckInDate, &res.CheckOutDate,
+			&res.Status, &res.HoldToken, &res.HoldExpiresAt, &res.CreatedAt, &res.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan expired hold row: %w", err)
+		}
+		results = append(results, &res)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("expired holds rows error: %w", err)
+	}
+
+	return results, nil
+}
+
+// MarkReservationExpired marks a reservation as EXPIRED.
+func (r *ReservationRepository) MarkReservationExpired(ctx context.Context, id uuid.UUID) error {
+	query := `
+		UPDATE reservation.reservations
+		SET status = 'EXPIRED', updated_at = NOW()
+		WHERE id = $1;
+	`
+
+	cmdTag, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("mark reservation expired: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrReservationNotFound
+	}
+
+	return nil
+}
+
 func generateBookingReference() string {
 	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	result := make([]byte, 8)

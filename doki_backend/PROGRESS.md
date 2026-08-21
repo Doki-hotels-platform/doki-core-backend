@@ -4,7 +4,7 @@
 > **Phase:** Phase 1 (Month 1 / Weeks 1–4) — Core Domain, Two-Tier Inventory Engine & Management APIs  
 > **Architecture:** Hexagonal / Clean Architecture (Modular Monolith)  
 > **Tech Stack:** Go 1.24, PostgreSQL 16 (pgxpool), Redis 7 (Lua Hold Engine), Chi Router, Docker, Prometheus  
-> **Current Status:** 7 of 9 Tasks Completed (78% Phase 1 Milestone Complete)
+> **Current Status:** 8 of 9 Tasks Completed (89% Phase 1 Milestone Complete)
 
 ---
 
@@ -12,11 +12,11 @@
 
 | Phase 1 Milestone | Target Tasks | Completed | Remaining | Current Test Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Phase 1: Foundation, Inventory & Admin Engine** | 9 Tasks | **7 (Tasks 1.1 – 1.7)** | **2 (Tasks 1.8 – 1.9)** | **PASS (0 Data Races / 100% Lint Clean)** |
+| **Phase 1: Foundation, Inventory & Admin Engine** | 9 Tasks | **8 (Tasks 1.1 – 1.8)** | **1 (Task 1.9)** | **PASS (0 Data Races / 100% Lint Clean)** |
 
 ---
 
-## Tasks Completed (Tasks 1.1 – 1.7)
+## Tasks Completed (Tasks 1.1 – 1.8)
 
 ### ✅ Task 1.1: Architectural Foundation, Directory Skeleton & Dev Stack
 * **Hexagonal / Clean Architecture Layout:** Structured directory tree separating pure business logic (`internal/domain/`) from external adapters (`internal/adapter/`), transports (`internal/adapter/http/`), and infrastructure platforms (`internal/platform/`).
@@ -76,7 +76,15 @@
 
 ---
 
-## Remaining Tasks to Complete Phase 1 (Tasks 1.8 – 1.9)
+### ✅ Task 1.8: Hold Expiry Sweeper Worker & Redis Reconciler
+* **Lock-Free Concurrency Sweeping:** Implemented `GetExpiredHolds` with `FOR UPDATE SKIP LOCKED` allowing concurrent worker replicas to poll expired holds without blocking or double-processing.
+* **Two-Tier Capacity Reconciliation:** Developed `HoldSweeperService` orchestrating Redis fast-path capacity reclamation (`ReleaseFastHold`) with PostgreSQL state transition (`EXPIRED`).
+* **Prometheus Telemetry:** Instrumented `doki_reservation_hold_expired_total` tracking reclaimed expired holds in real-time.
+* **Worker Daemon Coordination:** Wired `HoldExpiryWorker` on a high-frequency ticker (every 15 seconds) inside `cmd/worker/main.go` with graceful shutdown.
+
+---
+
+## Remaining Task to Complete Phase 1 (Task 1.9)
 
 ```
 [Phase 1 Implementation Track]
@@ -87,17 +95,12 @@
 ├── ✅ Task 1.5: Search API & Idempotent Hold HTTP Handlers
 ├── ✅ Task 1.6: Hierarchical RBAC & Admin Property CRUD
 ├── ✅ Task 1.7: Rolling Allocation Generator & Background Worker
-├── ⏳ Task 1.8: Hold Expiry Sweeper Worker & Redis Reconciler
+├── ✅ Task 1.8: Hold Expiry Sweeper Worker & Redis Reconciler
 └── ⏳ Task 1.9: Phase 1 High-Concurrency Stress Testing & CI Hardening
 ```
 
-### ⏳ Task 1.8: Hold Expiry Sweeper Worker & Redis Capacity Reconciler
-* Implement recurring background sweeper in `cmd/worker/` to find preliminary reservation holds that expired without payment confirmation (`status = 'INVENTORY_HOLD'` and `hold_expires_at < NOW()`).
-* Reconcile abandoned hold tokens in Redis, returning reserved capacity to available stock.
-* Add Prometheus telemetry tracking expired holds and capacity reconciliation health.
-
 ### ⏳ Task 1.9: Phase 1 Concurrency Race Testing, Code Cleanup & CI Hardening
-* Build a high-concurrency automated test suite simulating simultaneous multi-night hold requests against the same room type to verify zero overbooking under heavy contention.
+* Build a high-concurrency automated race test suite simulating simultaneous multi-night hold requests against the same room type to verify zero overbooking under heavy contention.
 * Execute repository-wide static analysis, enforce strict `depguard` import rules, and eliminate linter warnings.
 * Finalize Makefile targets and containerized CI pipeline to transition seamlessly into **Phase 2 (Booking & Checkout Engine, Payment Gateways & Webhooks)**.
 

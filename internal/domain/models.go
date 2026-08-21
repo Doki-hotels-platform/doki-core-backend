@@ -27,6 +27,7 @@ type Reservation struct {
 	CheckInDate      time.Time  `json:"check_in_date"`
 	CheckOutDate     time.Time  `json:"check_out_date"`
 	Status           string     `json:"status"`
+	HoldToken        *string    `json:"hold_token,omitempty"`
 	HoldExpiresAt    *time.Time `json:"hold_expires_at,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`

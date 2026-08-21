@@ -58,6 +58,14 @@ func (m *mockReservationRepo) GetByReference(ctx context.Context, ref string) (*
 	return nil, nil
 }
 
+func (m *mockReservationRepo) GetExpiredHolds(ctx context.Context, cutoff time.Time, limit int) ([]*domain.Reservation, error) {
+	return nil, nil
+}
+
+func (m *mockReservationRepo) MarkReservationExpired(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
 func (m *mockReservationRepo) UpdateStatus(ctx context.Context, id uuid.UUID, oldStatus, newStatus string) error {
 	if m.updateStatus != nil {
 		return m.updateStatus(ctx, id, oldStatus, newStatus)

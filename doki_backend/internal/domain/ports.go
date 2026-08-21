@@ -34,6 +34,8 @@ type ReservationRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*Reservation, error)
 	GetByReference(ctx context.Context, ref string) (*Reservation, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, oldStatus, newStatus string) error
+	GetExpiredHolds(ctx context.Context, cutoff time.Time, limit int) ([]*Reservation, error)
+	MarkReservationExpired(ctx context.Context, id uuid.UUID) error
 }
 
 // InventoryRepository is the sole entry point for the two-tier locking engine.

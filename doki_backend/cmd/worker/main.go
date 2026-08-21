@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	cacheAdapter "doki-backend/internal/adapter/cache/redis"
 	postgresRepo "doki-backend/internal/adapter/repository/postgres"
 	"doki-backend/internal/domain/inventory"
 	"doki-backend/internal/platform/cache"
@@ -27,7 +28,7 @@ var (
 
 func main() {
 	var (
-		flagRunOnce   = flag.Bool("once", false, "Run single allocation sweep and exit")
+		flagRunOnce   = flag.Bool("once", false, "Run single allocation & hold expiry sweep and exit")
 		flagDaysAhead = flag.Int("days", 365, "Number of forward days to maintain in inventory horizon")
 	)
 	flag.Parse()
@@ -79,21 +80,33 @@ func main() {
 
 	log.Info("worker connected to PostgreSQL and Redis successfully")
 
-	// 2. Initialize Repositories and Services
+	// 2. Initialize Repositories, Adapters and Services
 	invRepo := postgresRepo.NewInventoryRepository(dbPool)
 	propRepo := postgresRepo.NewPropertyRepository(dbPool)
-	allocService := inventory.NewAllocationService(invRepo, propRepo)
+	resRepo := postgresRepo.NewReservationRepository(dbPool)
 
-	sweeper := worker.NewAllocationSweeper(allocService, log, 24*time.Hour, *flagDaysAhead)
+	fastHoldAdapter, err := cacheAdapter.NewInventoryHoldAdapter(rdb)
+	if err != nil {
+		log.Error("worker failed to initialize Redis fast hold adapter", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	allocService := inventory.NewAllocationService(invRepo, propRepo)
+	holdSweeperService := inventory.NewHoldSweeperService(resRepo, fastHoldAdapter, log)
+
+	allocSweeper := worker.NewAllocationSweeper(allocService, log, 24*time.Hour, *flagDaysAhead)
+	holdExpiryWorker := worker.NewHoldExpiryWorker(holdSweeperService, log, 15*time.Second, 100)
 
 	// 3. Handle Single-Run CLI Flag (-once)
 	if *flagRunOnce {
-		log.Info("executing single allocation generation pass (-once mode)")
-		if err := sweeper.RunOnce(context.Background()); err != nil {
-			log.Error("single-pass sweep failed", slog.String("error", err.Error()))
-			os.Exit(1)
+		log.Info("executing single pass sweep for allocations and hold reconciler (-once mode)")
+		if err := allocSweeper.RunOnce(context.Background()); err != nil {
+			log.Error("single-pass allocation sweep failed", slog.String("error", err.Error()))
 		}
-		log.Info("single-pass allocation sweep completed successfully")
+		if err := holdExpiryWorker.RunOnce(context.Background()); err != nil {
+			log.Error("single-pass hold expiry sweep failed", slog.String("error", err.Error()))
+		}
+		log.Info("single-pass worker sweeps completed successfully")
 		return
 	}
 
@@ -131,9 +144,17 @@ func main() {
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 
+	// Allocation Sweeper (Rolling 365 days)
 	go func() {
-		if err := sweeper.Run(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
+		if err := allocSweeper.Run(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Error("allocation sweeper terminated with error", slog.String("error", err.Error()))
+		}
+	}()
+
+	// Hold Expiry Reconciler (Every 15s)
+	go func() {
+		if err := holdExpiryWorker.Run(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Error("hold expiry worker terminated with error", slog.String("error", err.Error()))
 		}
 	}()
 
