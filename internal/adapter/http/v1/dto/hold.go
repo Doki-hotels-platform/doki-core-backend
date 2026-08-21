@@ -6,7 +6,7 @@ import "time"
 type CreateHoldRequest struct {
 	PropertyID string `json:"property_id"`
 	RoomTypeID string `json:"room_type_id"`
-	CheckIn    string `json:"check_in"` // YYYY-MM-DD
+	CheckIn    string `json:"check_in"`  // YYYY-MM-DD
 	CheckOut   string `json:"check_out"` // YYYY-MM-DD
 	GuestName  string `json:"guest_name"`
 	GuestPhone string `json:"guest_phone"`

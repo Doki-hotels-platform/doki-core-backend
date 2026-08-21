@@ -75,22 +75,30 @@ type mockAllocPropRepo struct {
 	roomTypes  map[uuid.UUID][]*property.RoomType
 }
 
-func (m *mockAllocPropRepo) CreateProperty(ctx context.Context, p *property.Property) error { return nil }
+func (m *mockAllocPropRepo) CreateProperty(ctx context.Context, p *property.Property) error {
+	return nil
+}
 func (m *mockAllocPropRepo) GetPropertyByID(ctx context.Context, id uuid.UUID) (*property.Property, error) {
 	return nil, nil
 }
-func (m *mockAllocPropRepo) UpdateProperty(ctx context.Context, p *property.Property) error { return nil }
+func (m *mockAllocPropRepo) UpdateProperty(ctx context.Context, p *property.Property) error {
+	return nil
+}
 func (m *mockAllocPropRepo) ListProperties(ctx context.Context, filter property.PropertyFilter) ([]*property.Property, error) {
 	return m.properties, nil
 }
-func (m *mockAllocPropRepo) CreateRoomType(ctx context.Context, rt *property.RoomType) error { return nil }
+func (m *mockAllocPropRepo) CreateRoomType(ctx context.Context, rt *property.RoomType) error {
+	return nil
+}
 func (m *mockAllocPropRepo) GetRoomTypeByID(ctx context.Context, id uuid.UUID) (*property.RoomType, error) {
 	return nil, nil
 }
 func (m *mockAllocPropRepo) ListRoomTypesByProperty(ctx context.Context, propertyID uuid.UUID) ([]*property.RoomType, error) {
 	return m.roomTypes[propertyID], nil
 }
-func (m *mockAllocPropRepo) CreateRoom(ctx context.Context, r *property.PhysicalRoom) error { return nil }
+func (m *mockAllocPropRepo) CreateRoom(ctx context.Context, r *property.PhysicalRoom) error {
+	return nil
+}
 func (m *mockAllocPropRepo) ListRoomsByProperty(ctx context.Context, propertyID uuid.UUID) ([]*property.PhysicalRoom, error) {
 	return nil, nil
 }

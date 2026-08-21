@@ -78,11 +78,11 @@ type PropertyRepository interface {
 	GetPropertyByID(ctx context.Context, id uuid.UUID) (*property.Property, error)
 	UpdateProperty(ctx context.Context, p *property.Property) error
 	ListProperties(ctx context.Context, filter PropertyFilter) ([]*property.Property, error)
-	
+
 	CreateRoomType(ctx context.Context, rt *property.RoomType) error
 	GetRoomTypeByID(ctx context.Context, id uuid.UUID) (*property.RoomType, error)
 	ListRoomTypesByProperty(ctx context.Context, propertyID uuid.UUID) ([]*property.RoomType, error)
-	
+
 	CreateRoom(ctx context.Context, r *property.PhysicalRoom) error
 	ListRoomsByProperty(ctx context.Context, propertyID uuid.UUID) ([]*property.PhysicalRoom, error)
 }

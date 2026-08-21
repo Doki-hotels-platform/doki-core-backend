@@ -27,10 +27,10 @@ func NewJWTTokenIssuer(secret []byte, ttl time.Duration) *JWTTokenIssuer {
 }
 
 type jwtCustomClaims struct {
-	UserID             uuid.UUID   `json:"sub"`
+	UserID             uuid.UUID     `json:"sub"`
 	Role               identity.Role `json:"role"`
-	Region             *string     `json:"region,omitempty"`
-	PropertyAssignment []uuid.UUID `json:"property_ids,omitempty"`
+	Region             *string       `json:"region,omitempty"`
+	PropertyAssignment []uuid.UUID   `json:"property_ids,omitempty"`
 	jwt.RegisteredClaims
 }
 

@@ -14,18 +14,18 @@ var (
 	ErrInvalidStatusChange  = errors.New("invalid reservation state transition")
 
 	// Authentication & Authorization Errors
-	ErrUnauthorized         = errors.New("unauthorized: missing or invalid credentials")
-	ErrForbidden            = errors.New("forbidden: insufficient permissions for this operation")
-	ErrUserNotFound         = errors.New("user not found")
-	ErrUserInactive         = errors.New("user account is inactive")
+	ErrUnauthorized = errors.New("unauthorized: missing or invalid credentials")
+	ErrForbidden    = errors.New("forbidden: insufficient permissions for this operation")
+	ErrUserNotFound = errors.New("user not found")
+	ErrUserInactive = errors.New("user account is inactive")
 
 	// Resource & Entity Errors
-	ErrNotFound             = errors.New("requested resource not found")
-	ErrConflict             = errors.New("resource conflict occurred")
-	ErrAlreadyExists        = errors.New("resource already exists")
-	ErrValidation           = errors.New("validation failed: invalid input data")
-	ErrInvalidParameters    = errors.New("invalid or missing required parameters")
-	ErrPasswordTooShort     = errors.New("password must be at least 8 characters long")
+	ErrNotFound          = errors.New("requested resource not found")
+	ErrConflict          = errors.New("resource conflict occurred")
+	ErrAlreadyExists     = errors.New("resource already exists")
+	ErrValidation        = errors.New("validation failed: invalid input data")
+	ErrInvalidParameters = errors.New("invalid or missing required parameters")
+	ErrPasswordTooShort  = errors.New("password must be at least 8 characters long")
 
 	// Payment & Billing Errors
 	ErrPaymentFailed        = errors.New("payment processing failed")
@@ -33,5 +33,5 @@ var (
 	ErrDuplicateTransaction = errors.New("duplicate transaction detected")
 
 	// Concurrency & Idempotency Errors
-	ErrIdempotencyConflict  = errors.New("concurrent request with same idempotency key in flight")
+	ErrIdempotencyConflict = errors.New("concurrent request with same idempotency key in flight")
 )

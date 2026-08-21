@@ -52,11 +52,11 @@ func (s *AllocationSweeper) Run(ctx context.Context) error {
 
 	for {
 		select {
-			case <-ctx.Done():
-				s.logger.Info("stopping daily allocation sweeper worker gracefully")
-				return ctx.Err()
-			case <-ticker.C:
-				s.sweep(ctx)
+		case <-ctx.Done():
+			s.logger.Info("stopping daily allocation sweeper worker gracefully")
+			return ctx.Err()
+		case <-ticker.C:
+			s.sweep(ctx)
 		}
 	}
 }

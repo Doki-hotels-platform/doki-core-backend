@@ -101,7 +101,7 @@ func seedConcurrencyProperty(ctx context.Context, t *testing.T, pool *pgxpool.Po
 	roomTypeID := uuid.New()
 	ownerID := uuid.New()
 
-	today := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, 10)
+	today := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, 10)
 	checkIn := today
 	checkOut := today.AddDate(0, 0, 1)
 
@@ -335,7 +335,7 @@ func TestConcurrency_DeadlockPrevention_CrossDateBookings(t *testing.T) {
 	ownerID := uuid.New()
 	totalUnits := 100
 
-	today := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, 30)
+	today := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, 30)
 
 	// Seed property and 10 consecutive daily allocation slices
 	_, _ = pool.Exec(ctx, `
