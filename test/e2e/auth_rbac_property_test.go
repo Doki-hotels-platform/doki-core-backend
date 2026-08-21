@@ -23,6 +23,7 @@ import (
 	"doki-backend/internal/domain/identity"
 	"doki-backend/internal/domain/inventory"
 	"doki-backend/internal/domain/property"
+	"doki-backend/internal/platform/auth"
 	"doki-backend/internal/platform/cache"
 	"doki-backend/internal/platform/database"
 	"doki-backend/internal/platform/logger"
@@ -66,7 +67,8 @@ func setupAdminE2E(t *testing.T) (*pgxpool.Pool, *redis.Client, http.Handler, *i
 	resRepo := postgresRepo.NewReservationRepository(pool)
 	propRepo := postgresRepo.NewPropertyRepository(pool)
 
-	authService := identity.NewAuthService(userRepo, testJWTSecret, 24*time.Hour)
+	tokenIssuer := auth.NewJWTTokenIssuer(testJWTSecret, 24*time.Hour)
+	authService := identity.NewAuthService(userRepo, tokenIssuer)
 	propService := property.NewPropertyService(propRepo, userRepo)
 
 	fastHoldAdapter, err := cacheAdapter.NewInventoryHoldAdapter(rdb)

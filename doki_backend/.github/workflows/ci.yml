@@ -45,6 +45,7 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
+        continue-on-error: false
 
       - name: Verify Go Module Parity
         run: |
@@ -58,9 +59,9 @@ jobs:
           go run ./cmd/migrate/main.go -up -path migrations
 
       - name: Run golangci-lint & Depguard Boundary Enforcement
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.59.1
+          version: v1.60.3
           args: --timeout=5m
 
       - name: Run Unit & Race Condition Tests

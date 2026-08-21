@@ -25,3 +25,8 @@ type UserRepository interface {
 	GetUserPropertyAssignments(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	AssignUserToProperty(ctx context.Context, userID, propertyID uuid.UUID) error
 }
+
+// TokenIssuer defines the port for issuing authentication tokens.
+type TokenIssuer interface {
+	GenerateToken(user *User, propertyIDs []uuid.UUID) (string, error)
+}

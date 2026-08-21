@@ -18,6 +18,7 @@ import (
 	"doki-backend/internal/domain/identity"
 	"doki-backend/internal/domain/inventory"
 	"doki-backend/internal/domain/property"
+	"doki-backend/internal/platform/auth"
 	"doki-backend/internal/platform/cache"
 	"doki-backend/internal/platform/database"
 	"doki-backend/internal/platform/logger"
@@ -139,7 +140,8 @@ func main() {
 	resRepo := postgresRepo.NewReservationRepository(dbPool)
 	propRepo := postgresRepo.NewPropertyRepository(dbPool)
 
-	authService := identity.NewAuthService(userRepo, []byte(cfg.JWTSecret), 24*time.Hour)
+	tokenIssuer := auth.NewJWTTokenIssuer([]byte(cfg.JWTSecret), 24*time.Hour)
+	authService := identity.NewAuthService(userRepo, tokenIssuer)
 	propService := property.NewPropertyService(propRepo, userRepo)
 
 	fastHoldAdapter, err := cacheAdapter.NewInventoryHoldAdapter(redisClient)

@@ -4,33 +4,25 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	BcryptCost    = 12
-	DefaultJWTTTL = 24 * time.Hour
+	BcryptCost = 12
 )
 
-// AuthService handles authentication, password hashing, and token issuance.
+// AuthService handles authentication, password hashing, and token issuance delegation.
 type AuthService struct {
-	userRepo  UserRepository
-	jwtSecret []byte
-	tokenTTL  time.Duration
+	userRepo    UserRepository
+	tokenIssuer TokenIssuer
 }
 
-func NewAuthService(userRepo UserRepository, jwtSecret []byte, tokenTTL time.Duration) *AuthService {
-	if tokenTTL <= 0 {
-		tokenTTL = DefaultJWTTTL
-	}
+func NewAuthService(userRepo UserRepository, tokenIssuer TokenIssuer) *AuthService {
 	return &AuthService{
-		userRepo:  userRepo,
-		jwtSecret: jwtSecret,
-		tokenTTL:  tokenTTL,
+		userRepo:    userRepo,
+		tokenIssuer: tokenIssuer,
 	}
 }
 
@@ -109,11 +101,7 @@ func (s *AuthService) Login(ctx context.Context, identifier, password string) (s
 		user, err = s.userRepo.GetByPhone(ctx, identifier)
 	}
 
-	if err != nil {
-		return "", nil, ErrUnauthorized
-	}
-
-	if !user.IsActive {
+	if err != nil || !user.IsActive {
 		return "", nil, ErrUnauthorized
 	}
 
@@ -128,38 +116,15 @@ func (s *AuthService) Login(ctx context.Context, identifier, password string) (s
 		return "", nil, fmt.Errorf("fetch user property assignments: %w", err)
 	}
 
-	// Issue HS256 signed JWT
-	token, err := s.generateToken(user, propertyIDs)
+	if s.tokenIssuer == nil {
+		return "", nil, fmt.Errorf("token issuer not configured")
+	}
+
+	// Delegate token issuance to TokenIssuer port adapter
+	token, err := s.tokenIssuer.GenerateToken(user, propertyIDs)
 	if err != nil {
 		return "", nil, fmt.Errorf("generate auth token: %w", err)
 	}
 
 	return token, user, nil
-}
-
-type jwtCustomClaims struct {
-	UserID             uuid.UUID   `json:"sub"`
-	Role               Role        `json:"role"`
-	Region             *string     `json:"region,omitempty"`
-	PropertyAssignment []uuid.UUID `json:"property_ids,omitempty"`
-	jwt.RegisteredClaims
-}
-
-func (s *AuthService) generateToken(user *User, propertyIDs []uuid.UUID) (string, error) {
-	now := time.Now().UTC()
-	claims := jwtCustomClaims{
-		UserID:             user.ID,
-		Role:               user.Role,
-		Region:             user.Region,
-		PropertyAssignment: propertyIDs,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(now.Add(s.tokenTTL)),
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "doki-auth-engine",
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(s.jwtSecret)
 }
