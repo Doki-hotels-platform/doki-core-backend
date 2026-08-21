@@ -49,6 +49,9 @@ type InventoryRepository interface {
 
 	// GetDailyAllocations retrieves availability slices for search queries.
 	GetDailyAllocations(ctx context.Context, propertyID, roomTypeID uuid.UUID, startDate, endDate time.Time) ([]*DailyAllocation, error)
+
+	// BatchUpsertDailyAllocations inserts or updates rolling daily allocation records while preserving allocated counts.
+	BatchUpsertDailyAllocations(ctx context.Context, allocations []*DailyAllocation) error
 }
 
 // FastHoldPort defines Layer 1 (Redis) fast-path inventory hold operations.

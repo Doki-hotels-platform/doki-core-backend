@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -181,4 +182,67 @@ func (r *InventoryRepository) GetDailyAllocations(ctx context.Context, propertyI
 	}
 
 	return results, nil
+}
+
+// BatchUpsertDailyAllocations executes high-performance batch upsert using a single transaction.
+// It inserts new daily allocation slices and updates total_units and rate_minor on conflict,
+// strictly protecting allocated_count and blocked_count from being overwritten if reservations exist.
+func (r *InventoryRepository) BatchUpsertDailyAllocations(ctx context.Context, allocations []*domain.DailyAllocation) error {
+	if len(allocations) == 0 {
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin batch upsert tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	batch := &pgx.Batch{}
+	upsertQuery := `
+		INSERT INTO inventory.daily_allocations (
+			id, property_id, room_type_id, stay_date, total_units, allocated_count, blocked_count, rate_minor
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8
+		)
+		ON CONFLICT (property_id, room_type_id, stay_date)
+		DO UPDATE SET
+			total_units = EXCLUDED.total_units,
+			rate_minor = EXCLUDED.rate_minor
+		WHERE inventory.daily_allocations.allocated_count = 0;
+	`
+
+	for _, a := range allocations {
+		id := a.ID
+		if id == uuid.Nil {
+			id = uuid.New()
+		}
+		batch.Queue(
+			upsertQuery,
+			id, a.PropertyID, a.RoomTypeID,
+			a.StayDate.Format("2006-01-02"),
+			a.TotalUnits, a.AllocatedCount, a.BlockedCount,
+			a.RateMinor.AmountMinor,
+		)
+	}
+
+	br := tx.SendBatch(ctx, batch)
+	for i := 0; i < len(allocations); i++ {
+		if _, err := br.Exec(); err != nil {
+			_ = br.Close()
+			return fmt.Errorf("exec batch item %d: %w", i, err)
+		}
+	}
+
+	if err := br.Close(); err != nil {
+		return fmt.Errorf("close batch results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit batch upsert tx: %w", err)
+	}
+
+	return nil
 }

@@ -2,15 +2,22 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"flag"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	postgresRepo "doki-backend/internal/adapter/repository/postgres"
+	"doki-backend/internal/domain/inventory"
 	"doki-backend/internal/platform/cache"
 	"doki-backend/internal/platform/database"
 	"doki-backend/internal/platform/logger"
+	"doki-backend/internal/platform/worker"
 )
 
 var (
@@ -19,6 +26,12 @@ var (
 )
 
 func main() {
+	var (
+		flagRunOnce   = flag.Bool("once", false, "Run single allocation sweep and exit")
+		flagDaysAhead = flag.Int("days", 365, "Number of forward days to maintain in inventory horizon")
+	)
+	flag.Parse()
+
 	log := logger.New(logger.Config{
 		Level:  slog.LevelInfo,
 		Output: os.Stdout,
@@ -28,20 +41,28 @@ func main() {
 	log.Info("starting DOKI Background Worker",
 		slog.String("version", Version),
 		slog.String("build_time", BuildTime),
+		slog.Bool("run_once", *flagRunOnce),
 	)
 
 	dbDSN := os.Getenv("DATABASE_URL")
 	if dbDSN == "" {
 		dbDSN = "postgres://doki:doki_secret@localhost:5432/doki_db?sslmode=disable"
 	}
+
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
 	}
 
+	healthPort := os.Getenv("WORKER_HEALTH_PORT")
+	if healthPort == "" {
+		healthPort = "9091"
+	}
+
 	initCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// 1. Initialize Database & Cache pools
 	dbPool, err := database.NewPool(initCtx, dbDSN)
 	if err != nil {
 		log.Error("worker failed to connect to PostgreSQL", slog.String("error", err.Error()))
@@ -56,11 +77,78 @@ func main() {
 	}
 	defer func() { _ = rdb.Close() }()
 
-	log.Info("worker subsystems initialized (outbox relay & hold expiry sweeper scaffold)")
+	log.Info("worker connected to PostgreSQL and Redis successfully")
 
+	// 2. Initialize Repositories and Services
+	invRepo := postgresRepo.NewInventoryRepository(dbPool)
+	propRepo := postgresRepo.NewPropertyRepository(dbPool)
+	allocService := inventory.NewAllocationService(invRepo, propRepo)
+
+	sweeper := worker.NewAllocationSweeper(allocService, log, 24*time.Hour, *flagDaysAhead)
+
+	// 3. Handle Single-Run CLI Flag (-once)
+	if *flagRunOnce {
+		log.Info("executing single allocation generation pass (-once mode)")
+		if err := sweeper.RunOnce(context.Background()); err != nil {
+			log.Error("single-pass sweep failed", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		log.Info("single-pass allocation sweep completed successfully")
+		return
+	}
+
+	// 4. Setup Worker Health Probe Server (:9091)
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "UP", "component": "doki-worker"})
+	})
+	healthMux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := dbPool.Ping(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "UNAVAILABLE", "error": err.Error()})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "READY", "component": "doki-worker"})
+	})
+
+	healthServer := &http.Server{
+		Addr:         ":" + healthPort,
+		Handler:      healthMux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		log.Info("starting worker health probe server", slog.String("addr", ":"+healthPort))
+		if err := healthServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("worker health server error", slog.String("error", err.Error()))
+		}
+	}()
+
+	// 5. Start Background Sweepers with Signal Context
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+
+	go func() {
+		if err := sweeper.Run(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Error("allocation sweeper terminated with error", slog.String("error", err.Error()))
+		}
+	}()
+
+	// 6. Graceful Teardown on SIGINT / SIGTERM
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
-	<-shutdown
-	log.Info("worker shutting down cleanly")
+	sig := <-shutdown
+	log.Info("shutdown signal received, commencing graceful teardown", slog.String("signal", sig.String()))
+
+	workerCancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	_ = healthServer.Shutdown(shutdownCtx)
+	log.Info("worker shutdown completed cleanly")
 }
