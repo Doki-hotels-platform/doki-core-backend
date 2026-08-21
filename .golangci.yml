@@ -19,35 +19,35 @@ linters-settings:
     rules:
       domain-pure-boundary:
         files:
-          - "internal/domain/**/*.go"
+          - "internal/domain/**"
         deny:
-          - pkg: "github.com/jackc/pgx/**"
+          - pkg: "github.com/jackc/pgx"
             desc: "Domain layer must not import PostgreSQL driver"
-          - pkg: "github.com/redis/go-redis/**"
+          - pkg: "github.com/redis/go-redis"
             desc: "Domain layer must not import Redis cache client"
-          - pkg: "github.com/go-chi/chi/**"
+          - pkg: "github.com/go-chi/chi"
             desc: "Domain layer must not import HTTP router framework"
           - pkg: "net/http"
             desc: "Domain layer must not import HTTP transport package"
-          - pkg: "doki-backend/internal/adapter/**"
+          - pkg: "doki-backend/internal/adapter"
             desc: "Domain layer must not import adapter implementations"
-          - pkg: "doki-backend/internal/platform/**"
+          - pkg: "doki-backend/internal/platform"
             desc: "Domain layer must not import platform infrastructure"
       adapter-repository-boundary:
         files:
-          - "internal/adapter/repository/**/*.go"
+          - "internal/adapter/repository/**"
         deny:
-          - pkg: "doki-backend/internal/adapter/http/**"
+          - pkg: "doki-backend/internal/adapter/http"
             desc: "Repository adapters must not import HTTP layer"
-          - pkg: "github.com/go-chi/chi/**"
+          - pkg: "github.com/go-chi/chi"
             desc: "Repository adapters must not import HTTP routing"
       adapter-cache-boundary:
         files:
-          - "internal/adapter/cache/**/*.go"
+          - "internal/adapter/cache/**"
         deny:
-          - pkg: "doki-backend/internal/adapter/http/**"
+          - pkg: "doki-backend/internal/adapter/http"
             desc: "Cache adapters must not import HTTP layer"
-          - pkg: "github.com/jackc/pgx/**"
+          - pkg: "github.com/jackc/pgx"
             desc: "Cache adapters must not import database drivers"
 
 issues:
