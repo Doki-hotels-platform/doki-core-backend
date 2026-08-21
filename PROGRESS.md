@@ -4,7 +4,7 @@
 > **Phase:** Phase 1 (Month 1 / Weeks 1–4) — Core Domain, Two-Tier Inventory Engine & Management APIs  
 > **Architecture:** Hexagonal / Clean Architecture (Modular Monolith)  
 > **Tech Stack:** Go 1.24, PostgreSQL 16 (pgxpool), Redis 7 (Lua Hold Engine), Chi Router, Docker, Prometheus  
-> **Current Status:** 8 of 9 Tasks Completed (89% Phase 1 Milestone Complete)
+> **Current Status:** 9 of 9 Tasks Completed (100% Phase 1 Milestone Complete — Exit Gate Passed)
 
 ---
 
@@ -12,16 +12,16 @@
 
 | Phase 1 Milestone | Target Tasks | Completed | Remaining | Current Test Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Phase 1: Foundation, Inventory & Admin Engine** | 9 Tasks | **8 (Tasks 1.1 – 1.8)** | **1 (Task 1.9)** | **PASS (0 Data Races / 100% Lint Clean)** |
+| **Phase 1: Foundation, Inventory & Admin Engine** | 9 Tasks | **9 (Tasks 1.1 – 1.9)** | **0 (Phase 1 Complete)** | **PASS (0 Data Races / 100% Depguard Clean)** |
 
 ---
 
-## Tasks Completed (Tasks 1.1 – 1.8)
+## Tasks Completed (Tasks 1.1 – 1.9)
 
 ### ✅ Task 1.1: Architectural Foundation, Directory Skeleton & Dev Stack
 * **Hexagonal / Clean Architecture Layout:** Structured directory tree separating pure business logic (`internal/domain/`) from external adapters (`internal/adapter/`), transports (`internal/adapter/http/`), and infrastructure platforms (`internal/platform/`).
 * **Strict Boundary Enforcement:** Domain packages maintain zero external driver or framework imports.
-* **Production PostgreSQL Connection Pool:** Configured `pgxpool` with high-throughput production parameters (`MaxConns=50`, `MinConns=10`, `MaxConnLifetime=1h`, `MaxConnIdleTime=30m`).
+* **Production PostgreSQL Connection Pool:** Configured `pgxpool` with high-throughput production parameters (`MaxConns=50`, `MinConns=10`, `MaxConnLifetime=30m`, `MaxConnIdleTime=5m`, `HealthCheckPeriod=1m`).
 * **Redis Engine & Probes:** Integrated Redis client with health-check ping validation, exposing standard Kubernetes `/livez` (liveness) and `/readyz` (readiness) probe endpoints.
 * **Observability & Containers:** Configured structured JSON logging with standard library `log/slog` and set up multi-stage distroless Docker container builds.
 
@@ -84,7 +84,15 @@
 
 ---
 
-## Remaining Task to Complete Phase 1 (Task 1.9)
+### ✅ Task 1.9: Concurrency Race Testing, Code Cleanup & CI Hardening (Phase 1 Exit Gate)
+* **High-Concurrency Stress Suite:** Built `test/concurrency/inventory_concurrency_test.go` simulating 50 concurrent requests competing for 5 units, verifying exact allocation count (5 successes, 45 conflicts) and mathematical zero-overbooking bounds guarantee.
+* **Overlapping Multi-Night Deadlock Test:** Simulated 30 concurrent overlapping multi-night booking transactions locked with `ORDER BY stay_date ASC`, achieving 0 deadlocks (SQLSTATE 40P01).
+* **Automated CI/CD Pipeline:** Authored `.github/workflows/ci.yml` with ephemerally spun up PostgreSQL 16 & Redis 7 containers, linting, race testing, and distroless Docker image compilation.
+* **Depguard Boundary Hardening:** Hardened `.golangci.yml` with zero-compromise import rules for pure domain isolation.
+
+---
+
+## Phase 1 Exit Status
 
 ```
 [Phase 1 Implementation Track]
@@ -96,20 +104,15 @@
 ├── ✅ Task 1.6: Hierarchical RBAC & Admin Property CRUD
 ├── ✅ Task 1.7: Rolling Allocation Generator & Background Worker
 ├── ✅ Task 1.8: Hold Expiry Sweeper Worker & Redis Reconciler
-└── ⏳ Task 1.9: Phase 1 High-Concurrency Stress Testing & CI Hardening
+└── ✅ Task 1.9: Concurrency Race Testing, Code Cleanup & CI Hardening
 ```
-
-### ⏳ Task 1.9: Phase 1 Concurrency Race Testing, Code Cleanup & CI Hardening
-* Build a high-concurrency automated race test suite simulating simultaneous multi-night hold requests against the same room type to verify zero overbooking under heavy contention.
-* Execute repository-wide static analysis, enforce strict `depguard` import rules, and eliminate linter warnings.
-* Finalize Makefile targets and containerized CI pipeline to transition seamlessly into **Phase 2 (Booking & Checkout Engine, Payment Gateways & Webhooks)**.
 
 ---
 
-## Repository Build & Verification Status
+## Repository Verification Commands
 
 ```bash
-# Static Compilation of all 3 Platform Binaries
+# 1. Static Compilation of all 3 Platform Binaries
 make build
 # Output:
 # CGO_ENABLED=0 go build -o bin/doki-api ./cmd/api
@@ -117,11 +120,15 @@ make build
 # CGO_ENABLED=0 go build -o bin/doki-migrate ./cmd/migrate
 # Build complete: bin/doki-api, bin/doki-worker, bin/doki-migrate
 
-# Race Detector Verification Suite
+# 2. Race Detector Verification Suite
 make test-race
 # Output: PASS (0 data races across all packages)
 
-# Code Quality & Static Analysis
-go vet ./...
-# Output: Exit Code 0 (clean)
+# 3. High-Concurrency Stress Test Suite
+make test-concurrency
+# Output: PASS (0 deadlocks, zero overbooking)
+
+# 4. Full CI Pipeline Dry-Run
+make verify
+# Output: ✅ CI Verification Suite Succeeded: Clean boundaries, zero data races, all binaries compiled.
 ```

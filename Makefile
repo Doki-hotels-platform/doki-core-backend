@@ -1,4 +1,4 @@
-.PHONY: help build run-api run-worker test test-race lint tidy docker-up docker-down docker-build migrate-up migrate-down migrate-version migrate-verify
+.PHONY: help build run-api run-worker test test-race test-concurrency lint verify tidy docker-up docker-down docker-build migrate-up migrate-down migrate-version migrate-verify
 
 SHELL := /bin/bash
 BIN_DIR := bin
@@ -33,23 +33,30 @@ run-api: ## Run API server locally
 run-worker: ## Run background worker locally
 	go run ./cmd/worker
 
-test: ## Run unit tests
+test: ## Run standard unit tests
 	go test -v ./...
 
-test-race: ## Run all tests with Go race detector
+test-race: ## Run all tests with Go data race detector
 	go test -race -v ./...
+
+test-concurrency: ## Run high-concurrency inventory race tests
+	go test -race -v -count=1 ./test/concurrency/...
 
 lint: ## Run golangci-lint with depguard import boundary verification
 	golangci-lint run ./...
 
+verify: tidy lint test-race build ## Run full CI pipeline verification suite (tidy -> lint -> test-race -> build)
+	@echo "✅ CI Verification Suite Succeeded: Clean boundaries, zero data races, all binaries compiled."
+
 docker-up: ## Start local PostgreSQL and Redis dev stack
-	docker compose up -d postgres redis
+	docker compose -f deploy/compose/docker-compose.yml up -d postgres redis
 
 docker-down: ## Stop local Docker containers
-	docker compose down
+	docker compose -f deploy/compose/docker-compose.yml down
 
 docker-build: ## Build production multi-stage distroless Docker image
-	docker build -t doki-api:$(VERSION) -f Dockerfile --build-arg BIN=api .
+	docker build -t doki-api:$(VERSION) -f deploy/docker/Dockerfile --build-arg BIN=api .
+	docker build -t doki-worker:$(VERSION) -f deploy/docker/Dockerfile --build-arg BIN=worker .
 
 migrate-up: ## Apply all pending database migrations
 	go run ./cmd/migrate -up

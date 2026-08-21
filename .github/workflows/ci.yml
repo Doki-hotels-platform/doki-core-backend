@@ -1,0 +1,87 @@
+name: DOKI Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate-and-test:
+    name: Lint, Test & Verify Boundary Constraints
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: doki
+          POSTGRES_PASSWORD: doki_secret
+          POSTGRES_DB: doki_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U doki -d doki_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.24
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Verify Go Module Parity
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Run Schema Migrations (CLI Dry-Run)
+        env:
+          DATABASE_URL: "postgres://doki:doki_secret@localhost:5432/doki_db?sslmode=disable"
+        run: |
+          go run ./cmd/migrate/main.go -up -path migrations
+
+      - name: Run golangci-lint & Depguard Boundary Enforcement
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.59.1
+          args: --timeout=5m
+
+      - name: Run Unit & Race Condition Tests
+        env:
+          DATABASE_URL: "postgres://doki:doki_secret@localhost:5432/doki_db?sslmode=disable"
+          REDIS_ADDR: "localhost:6379"
+        run: |
+          go test -race -v ./...
+
+      - name: Run High-Concurrency Capacity & Deadlock Stress Suite
+        env:
+          DATABASE_URL: "postgres://doki:doki_secret@localhost:5432/doki_db?sslmode=disable"
+          REDIS_ADDR: "localhost:6379"
+        run: |
+          go test -race -v -count=1 ./test/concurrency/...
+
+      - name: Compile All Platform Binaries
+        run: |
+          make build
+
+      - name: Build Distroless Docker Image
+        run: |
+          docker build -t doki-api:ci -f deploy/docker/Dockerfile --build-arg BIN=api .
+          docker build -t doki-worker:ci -f deploy/docker/Dockerfile --build-arg BIN=worker .

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"doki-backend/internal/domain/inventory"
+	"doki-backend/internal/platform/telemetry"
 )
 
 // HoldExpiryWorker runs on a high-frequency ticker to identify expired holds and reconcile Redis.
@@ -67,10 +68,13 @@ func (w *HoldExpiryWorker) RunOnce(ctx context.Context) error {
 }
 
 func (w *HoldExpiryWorker) sweep(ctx context.Context) error {
-	_, err := w.sweeper.SweepExpiredHolds(ctx, w.batchSize)
+	swept, err := w.sweeper.SweepExpiredHolds(ctx, w.batchSize)
 	if err != nil {
 		w.logger.Error("hold expiry sweep cycle encountered an error", slog.String("error", err.Error()))
 		return err
+	}
+	if swept > 0 {
+		telemetry.ReservationHoldExpired.Add(float64(swept))
 	}
 	return nil
 }

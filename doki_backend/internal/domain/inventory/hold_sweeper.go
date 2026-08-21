@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"doki-backend/internal/domain"
-	"doki-backend/internal/platform/telemetry"
 )
 
 // HoldSweeperService identifies expired reservation holds and releases Redis & Postgres resources.
@@ -73,8 +72,6 @@ func (s *HoldSweeperService) SweepExpiredHolds(ctx context.Context, batchSize in
 			continue
 		}
 
-		// 3. Track metrics & count
-		telemetry.ReservationHoldExpired.Inc()
 		sweptCount++
 	}
 
