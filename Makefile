@@ -1,4 +1,4 @@
-.PHONY: help build run-api run-worker test test-race lint tidy docker-up docker-down docker-build migrate-up
+.PHONY: help build run-api run-worker test test-race lint tidy docker-up docker-down docker-build migrate-up migrate-down migrate-version migrate-verify
 
 SHELL := /bin/bash
 BIN_DIR := bin
@@ -17,38 +17,48 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 tidy: ## Download and tidy Go module dependencies
-	cd doki_backend && go mod tidy && go mod verify
+	go mod tidy
+	go mod verify
 
 build: ## Build all binaries (api, worker, migrate)
-	@mkdir -p doki_backend/$(BIN_DIR)
-	cd doki_backend && CGO_ENABLED=0 go build $(LDFLAGS) -o $(BIN_DIR)/doki-api ./cmd/api
-	cd doki_backend && CGO_ENABLED=0 go build $(LDFLAGS) -o $(BIN_DIR)/doki-worker ./cmd/worker
-	cd doki_backend && CGO_ENABLED=0 go build $(LDFLAGS) -o $(BIN_DIR)/doki-migrate ./cmd/migrate
-	@echo "Build complete."
+	@mkdir -p $(BIN_DIR)
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(API_BIN) ./cmd/api
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(WORKER_BIN) ./cmd/worker
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(MIGRATE_BIN) ./cmd/migrate
+	@echo "Build complete: $(API_BIN), $(WORKER_BIN), $(MIGRATE_BIN)"
 
 run-api: ## Run API server locally
-	cd doki_backend && go run ./cmd/api
+	go run ./cmd/api
 
 run-worker: ## Run background worker locally
-	cd doki_backend && go run ./cmd/worker
+	go run ./cmd/worker
 
 test: ## Run unit tests
-	cd doki_backend && go test -v ./...
+	go test -v ./...
 
 test-race: ## Run all tests with Go race detector
-	cd doki_backend && go test -race -v ./...
+	go test -race -v ./...
 
 lint: ## Run golangci-lint with depguard import boundary verification
-	cd doki_backend && golangci-lint run ./...
+	golangci-lint run ./...
 
 docker-up: ## Start local PostgreSQL and Redis dev stack
-	cd doki_backend && docker compose up -d postgres redis
+	docker compose up -d postgres redis
 
 docker-down: ## Stop local Docker containers
-	cd doki_backend && docker compose down
+	docker compose down
 
 docker-build: ## Build production multi-stage distroless Docker image
-	cd doki_backend && docker build -t doki-api:$(VERSION) -f Dockerfile --build-arg BIN=api .
+	docker build -t doki-api:$(VERSION) -f Dockerfile --build-arg BIN=api .
 
-migrate-up: ## Run SQL migrations against local database
-	cd doki_backend && go run ./cmd/migrate
+migrate-up: ## Apply all pending database migrations
+	go run ./cmd/migrate -up
+
+migrate-down: ## Rollback 1 migration step
+	go run ./cmd/migrate -down 1
+
+migrate-version: ## Print current database migration version
+	go run ./cmd/migrate -version
+
+migrate-verify: ## Run SQL schema & constraint verification script against local postgres
+	docker exec -i doki-postgres psql -U doki -d doki_db < test/verify_schema.sql

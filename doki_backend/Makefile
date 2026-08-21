@@ -1,4 +1,4 @@
-.PHONY: help build run-api run-worker test test-race lint tidy docker-up docker-down docker-build migrate-up
+.PHONY: help build run-api run-worker test test-race lint tidy docker-up docker-down docker-build migrate-up migrate-down migrate-version migrate-verify
 
 SHELL := /bin/bash
 BIN_DIR := bin
@@ -51,6 +51,14 @@ docker-down: ## Stop local Docker containers
 docker-build: ## Build production multi-stage distroless Docker image
 	docker build -t doki-api:$(VERSION) -f Dockerfile --build-arg BIN=api .
 
-migrate-up: ## Run SQL migrations against local database
-	@echo "Applying schema migrations..."
-	go run ./cmd/migrate
+migrate-up: ## Apply all pending database migrations
+	go run ./cmd/migrate -up
+
+migrate-down: ## Rollback 1 migration step
+	go run ./cmd/migrate -down 1
+
+migrate-version: ## Print current database migration version
+	go run ./cmd/migrate -version
+
+migrate-verify: ## Run SQL schema & constraint verification script against local postgres
+	docker exec -i doki-postgres psql -U doki -d doki_db < test/verify_schema.sql
