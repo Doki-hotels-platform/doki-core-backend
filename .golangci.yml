@@ -1,11 +1,18 @@
 version: "2"
+
 run:
+  timeout: 5m
   tests: true
+
 linters:
   enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
     - depguard
     - gosec
-    - misspell
     - revive
   settings:
     depguard:
@@ -54,9 +61,11 @@ linters:
       - third_party$
       - builtin$
       - examples$
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+
 formatters:
   exclusions:
     generated: lax
