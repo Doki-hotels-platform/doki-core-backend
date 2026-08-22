@@ -1,0 +1,57 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - depguard
+    - gosec
+    - misspell
+    - revive
+
+linters-settings:
+  depguard:
+    rules:
+      domain-pure-boundary:
+        files:
+          - "internal/domain/**"
+        deny:
+          - pkg: "github.com/jackc/pgx"
+            desc: "Domain layer must not import PostgreSQL driver"
+          - pkg: "github.com/redis/go-redis"
+            desc: "Domain layer must not import Redis cache client"
+          - pkg: "github.com/go-chi/chi"
+            desc: "Domain layer must not import HTTP router framework"
+          - pkg: "net/http"
+            desc: "Domain layer must not import HTTP transport package"
+          - pkg: "doki-backend/internal/adapter"
+            desc: "Domain layer must not import adapter implementations"
+          - pkg: "doki-backend/internal/platform"
+            desc: "Domain layer must not import platform infrastructure"
+      adapter-repository-boundary:
+        files:
+          - "internal/adapter/repository/**"
+        deny:
+          - pkg: "doki-backend/internal/adapter/http"
+            desc: "Repository adapters must not import HTTP layer"
+          - pkg: "github.com/go-chi/chi"
+            desc: "Repository adapters must not import HTTP routing"
+      adapter-cache-boundary:
+        files:
+          - "internal/adapter/cache/**"
+        deny:
+          - pkg: "doki-backend/internal/adapter/http"
+            desc: "Cache adapters must not import HTTP layer"
+          - pkg: "github.com/jackc/pgx"
+            desc: "Cache adapters must not import database drivers"
+
+issues:
+  exclude-dirs:
+    - test
+  max-issues-per-linter: 0
+  max-same-issues: 0
