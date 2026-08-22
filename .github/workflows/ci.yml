@@ -40,12 +40,11 @@ jobs:
       - name: Checkout Codebase
         uses: actions/checkout@v4
 
-      - name: Set up Go 1.25
+      - name: Set up Go 1.24
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: "1.24"
           cache: true
-        continue-on-error: false
 
       - name: Verify Go Module Parity
         run: |
@@ -59,8 +58,10 @@ jobs:
           go run ./cmd/migrate/main.go -up -path migrations
 
       - name: Run golangci-lint & Depguard Boundary Enforcement
-        run: |
-          go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.4.0 run --timeout=5m -v
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
+          args: --timeout=5m --verbose
 
       - name: Run Unit & Race Condition Tests
         env:

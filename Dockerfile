@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build Stage ----
-FROM golang:1.25-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 ARG BIN=api
 ARG VERSION=1.0.0
