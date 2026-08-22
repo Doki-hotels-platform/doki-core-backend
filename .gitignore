@@ -24,3 +24,6 @@ coverage.txt
 # OS artifacts
 .DS_Store
 Thumbs.db
+doki_backend/
+*.zip
+bin/
